@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PharmacyApi.Data;
 using PharmacyApi.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace PharmacyApi.Controllers;
 
+[Authorize] // Ensure that this controller requires authentication
 [ApiController]
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase
