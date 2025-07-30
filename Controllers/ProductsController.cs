@@ -4,7 +4,6 @@ using PharmacyApi.Data;
 using PharmacyApi.Models;
 using PharmacyApi.Dtos;
 using AutoMapper;
-using AutoMapper.QueryableExtensions;
 using Microsoft.AspNetCore.Authorization;
 
 namespace PharmacyApi.Controllers;
@@ -23,7 +22,7 @@ public class ProductsController : ControllerBase
         _mapper = mapper;
     }
 
-    // ✅ ENDPOINT DTO
+    // ✅ Get with DTO
     [HttpGet("dto")]
     public async Task<ActionResult<IEnumerable<ProductDto>>> GetProductDtos()
     {
@@ -38,44 +37,60 @@ public class ProductsController : ControllerBase
         return Ok(productDtos);
     }
 
-    // ✅ ENDPOINT EXISTING
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
+    // ✅ Get by ID with DTO
+    [HttpGet("dto/{id}")]
+    public async Task<ActionResult<ProductDto>> GetProductDto(int id)
     {
-        return await _context.Products.ToListAsync();
+        var product = await _context.Products
+            .Include(p => p.Category)
+            .Include(p => p.Unit)
+            .Include(p => p.Form)
+            .Include(p => p.Supplier)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (product == null) return NotFound();
+
+        var productDto = _mapper.Map<ProductDto>(product);
+        return Ok(productDto);
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Product>> GetProduct(int id)
-    {
-        var product = await _context.Products.FindAsync(id);
-        return product is null ? NotFound() : product;
-    }
-
+    // ✅ POST: Create product with validation
     [HttpPost]
-    public async Task<ActionResult<Product>> CreateProduct(Product product)
+    public async Task<ActionResult<ProductDto>> CreateProduct([FromBody] CreateProductDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var product = _mapper.Map<Product>(dto);
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
+
+        var result = _mapper.Map<ProductDto>(product);
+        return CreatedAtAction(nameof(GetProductDto), new { id = product.Id }, result);
     }
 
+    // ✅ PUT: Update product
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateProduct(int id, Product product)
+    public async Task<IActionResult> UpdateProduct(int id, [FromBody] UpdateProductDto dto)
     {
-        if (id != product.Id) return BadRequest();
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-        _context.Entry(product).State = EntityState.Modified;
+        var product = await _context.Products.FindAsync(id);
+        if (product == null) return NotFound();
+
+        _mapper.Map(dto, product);
         await _context.SaveChangesAsync();
 
         return NoContent();
     }
 
+    // ✅ DELETE: Remove product
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteProduct(int id)
     {
         var product = await _context.Products.FindAsync(id);
-        if (product is null) return NotFound();
+        if (product == null) return NotFound();
 
         _context.Products.Remove(product);
         await _context.SaveChangesAsync();
