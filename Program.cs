@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using PharmacyApi.Config;
+using PharmacyApi.Mapping;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,7 +74,19 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+
+// Add AutoMapper
+builder.Services.AddAutoMapper(typeof(MappingProfile));
+
+
+
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    DbSeeder.Seed(db);
+}
 
 app.UseSwagger();
 app.UseSwaggerUI();

@@ -2,22 +2,43 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PharmacyApi.Data;
 using PharmacyApi.Models;
+using PharmacyApi.Dtos;
+using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using Microsoft.AspNetCore.Authorization;
 
 namespace PharmacyApi.Controllers;
 
-[Authorize] // Ensure that this controller requires authentication
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IMapper _mapper;
 
-    public ProductsController(AppDbContext context)
+    public ProductsController(AppDbContext context, IMapper mapper)
     {
         _context = context;
+        _mapper = mapper;
     }
 
+    // ✅ ENDPOINT DTO
+    [HttpGet("dto")]
+    public async Task<ActionResult<IEnumerable<ProductDto>>> GetProductDtos()
+    {
+        var products = await _context.Products
+            .Include(p => p.Category)
+            .Include(p => p.Unit)
+            .Include(p => p.Form)
+            .Include(p => p.Supplier)
+            .ToListAsync();
+
+        var productDtos = _mapper.Map<List<ProductDto>>(products);
+        return Ok(productDtos);
+    }
+
+    // ✅ ENDPOINT EXISTING
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
     {
