@@ -1,32 +1,34 @@
 using Microsoft.EntityFrameworkCore;
-using PharmacyApi.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using PharmacyApi.Config;
+using PharmacyApi.Data;
 using PharmacyApi.Mapping;
-
+using PharmacyApi.Features.Products;
+using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Authentication services 1
+// ===== JWT Configuration =====
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtSettings>(jwtSection);
 var jwtSettings = jwtSection.Get<JwtSettings>();
 
-// Pengaturan yang diperlukan untuk koneksi database postgreSQL [WARIMAN]
+// ===== Database Configuration =====
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-// builder.Services.AddSwaggerGen();
+// ===== AutoMapper =====
+builder.Services.AddMediatR(typeof(Program));
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 
+// ===== Swagger + JWT Support =====
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new() { Title = "Pharmacy API", Version = "v1" });
 
-    // Tambah konfigurasi JWT Auth
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -53,8 +55,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-
-// Add Authentication services 2
+// ===== JWT Authentication =====
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -74,41 +75,33 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-
-// Add AutoMapper
-builder.Services.AddAutoMapper(typeof(MappingProfile));
-
-
+// ===== Controller support (opsional, jika masih ada controller lain) =====
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
+// ===== Seeder (opsional) =====
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     DbSeeder.Seed(db);
 }
 
+// ===== Middleware =====
 app.UseSwagger();
 app.UseSwaggerUI();
 
-
 app.UseHttpsRedirection();
-app.UseAuthentication(); // Add Authentication middleware 3
+
+app.UseAuthentication();
 app.UseAuthorization();
+
+// ===== Register Route Mediator =====
+ProductRoutes.MapProductRoutes(app); // Penting
+
+// ===== Masih support controller lain (jika ada) =====
 app.MapControllers();
 
-Console.WriteLine("Connecting to: " + builder.Configuration.GetConnectionString("DefaultConnection"));
-
-
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
+Console.WriteLine("Connected to: " + builder.Configuration.GetConnectionString("DefaultConnection"));
 
 app.Run();
-
