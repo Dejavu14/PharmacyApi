@@ -1,23 +1,33 @@
-using Microsoft.EntityFrameworkCore;
-using PharmacyApi.Data;
+using MediatR;
 using PharmacyApi.Dtos;
+using PharmacyApi.Data;
 using AutoMapper;
-using AutoMapper.QueryableExtensions;
+using Microsoft.EntityFrameworkCore;
 
 namespace PharmacyApi.Features.Products;
 
-public static class GetProducts
+public record GetProductsQuery() : IRequest<IEnumerable<ProductDto>>;
+
+public class GetProductsHandler : IRequestHandler<GetProductsQuery, IEnumerable<ProductDto>>
 {
-    public static async Task<IResult> Handle(AppDbContext db, IMapper mapper)
+    private readonly AppDbContext _db;
+    private readonly IMapper _mapper;
+
+    public GetProductsHandler(AppDbContext db, IMapper mapper)
     {
-        var productDtos = await db.Products
+        _db = db;
+        _mapper = mapper;
+    }
+
+    public async Task<IEnumerable<ProductDto>> Handle(GetProductsQuery request, CancellationToken cancellationToken)
+    {
+        var products = await _db.Products
             .Include(p => p.Category)
             .Include(p => p.Unit)
             .Include(p => p.Form)
             .Include(p => p.Supplier)
-            .ProjectTo<ProductDto>(mapper.ConfigurationProvider)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
-        return Results.Ok(productDtos);
+        return _mapper.Map<IEnumerable<ProductDto>>(products);
     }
 }

@@ -1,20 +1,39 @@
+using MediatR;
 using PharmacyApi.Data;
 using PharmacyApi.Dtos;
 using PharmacyApi.Models;
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 
 namespace PharmacyApi.Features.Products;
 
-public static class CreateProduct
+public record CreateProductCommand(CreateProductDto Dto) : IRequest<ProductDto>;
+
+public class CreateProductHandler : IRequestHandler<CreateProductCommand, ProductDto>
 {
-    public static async Task<IResult> Handle(AppDbContext db, IMapper mapper, CreateProductDto dto)
+    private readonly AppDbContext _db;
+    private readonly IMapper _mapper;
+
+    public CreateProductHandler(AppDbContext db, IMapper mapper)
     {
-        var product = mapper.Map<Product>(dto);
+        _db = db;
+        _mapper = mapper;
+    }
 
-        db.Products.Add(product);
-        await db.SaveChangesAsync();
+    public async Task<ProductDto> Handle(CreateProductCommand request, CancellationToken cancellationToken)
+    {
+        var product = _mapper.Map<Product>(request.Dto);
 
-        var result = mapper.Map<ProductDto>(product);
-        return Results.Created($"/api/products/{product.Id}", result);
+        _db.Products.Add(product);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var result = await _db.Products
+            .Include(p => p.Category)
+            .Include(p => p.Unit)
+            .Include(p => p.Form)
+            .Include(p => p.Supplier)
+            .FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken);
+
+        return _mapper.Map<ProductDto>(result!);
     }
 }

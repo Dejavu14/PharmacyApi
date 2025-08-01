@@ -1,3 +1,4 @@
+using MediatR;
 using PharmacyApi.Data;
 using PharmacyApi.Dtos;
 using AutoMapper;
@@ -5,16 +6,28 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PharmacyApi.Features.Products;
 
-public static class UpdateProduct
+public record UpdateProductCommand(int Id, UpdateProductDto Dto) : IRequest<bool>;
+
+public class UpdateProductHandler : IRequestHandler<UpdateProductCommand, bool>
 {
-    public static async Task<IResult> Handle(AppDbContext db, IMapper mapper, int id, UpdateProductDto dto)
+    private readonly AppDbContext _db;
+    private readonly IMapper _mapper;
+
+    public UpdateProductHandler(AppDbContext db, IMapper mapper)
     {
-        var product = await db.Products.FindAsync(id);
-        if (product is null) return Results.NotFound();
+        _db = db;
+        _mapper = mapper;
+    }
 
-        mapper.Map(dto, product);
-        await db.SaveChangesAsync();
+    public async Task<bool> Handle(UpdateProductCommand request, CancellationToken cancellationToken)
+    {
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == request.Id, cancellationToken);
 
-        return Results.NoContent();
+        if (product is null) return false;
+
+        _mapper.Map(request.Dto, product);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

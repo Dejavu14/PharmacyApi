@@ -1,24 +1,33 @@
-using Microsoft.EntityFrameworkCore;
-using PharmacyApi.Data;
+using MediatR;
 using PharmacyApi.Dtos;
+using PharmacyApi.Data;
 using AutoMapper;
-using AutoMapper.QueryableExtensions;
+using Microsoft.EntityFrameworkCore;
 
 namespace PharmacyApi.Features.Products;
 
-public static class GetProductById
+public record GetProductById(int Id) : IRequest<ProductDto?>;
+
+public class GetProductByIdHandler : IRequestHandler<GetProductById, ProductDto?>
 {
-    public static async Task<IResult> Handle(AppDbContext db, IMapper mapper, int id)
+    private readonly AppDbContext _db;
+    private readonly IMapper _mapper;
+
+    public GetProductByIdHandler(AppDbContext db, IMapper mapper)
     {
-        var productDto = await db.Products
-            .Where(p => p.Id == id)
+        _db = db;
+        _mapper = mapper;
+    }
+
+    public async Task<ProductDto?> Handle(GetProductById request, CancellationToken cancellationToken)
+    {
+        var product = await _db.Products
             .Include(p => p.Category)
             .Include(p => p.Unit)
             .Include(p => p.Form)
             .Include(p => p.Supplier)
-            .ProjectTo<ProductDto>(mapper.ConfigurationProvider)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(p => p.Id == request.Id, cancellationToken);
 
-        return productDto is null ? Results.NotFound() : Results.Ok(productDto);
+        return product is null ? null : _mapper.Map<ProductDto>(product);
     }
 }

@@ -1,6 +1,5 @@
-using AutoMapper;
+using MediatR;
 using Microsoft.AspNetCore.Builder;
-using PharmacyApi.Data;
 using PharmacyApi.Dtos;
 
 namespace PharmacyApi.Features.Products;
@@ -9,36 +8,43 @@ public static class ProductRoutes
 {
     public static void MapProductRoutes(WebApplication app)
     {
-        var group = app.MapGroup("/api/products").WithTags("Products");
+        var group = app.MapGroup("/api/products")
+            .WithTags("Products")
+            .RequireAuthorization(); 
 
         // GET all products
-        group.MapGet("/", async (AppDbContext db, IMapper mapper) =>
+        group.MapGet("/", async (ISender sender) =>
         {
-            return await GetProducts.Handle(db, mapper);
+            var result = await sender.Send(new GetProductsQuery());
+            return Results.Ok(result);
         });
 
         // GET product by ID
-        group.MapGet("/{id:int}", async (AppDbContext db, IMapper mapper, int id) =>
+        group.MapGet("/{id:int}", async (ISender sender, int id) =>
         {
-            return await GetProductById.Handle(db, mapper, id);
+            var result = await sender.Send(new GetProductById(id));
+            return result is null ? Results.NotFound() : Results.Ok(result);
         });
 
         // POST create product
-        group.MapPost("/", async (AppDbContext db, IMapper mapper, CreateProductDto dto) =>
+        group.MapPost("/", async (ISender sender, CreateProductDto dto) =>
         {
-            return await CreateProduct.Handle(db, mapper, dto);
+            var result = await sender.Send(new CreateProductCommand(dto));
+            return Results.Created($"/api/products/{result.Id}", result);
         });
 
         // PUT update product
-        group.MapPut("/{id:int}", async (AppDbContext db, IMapper mapper, int id, UpdateProductDto dto) =>
+        group.MapPut("/{id:int}", async (ISender sender, int id, UpdateProductDto dto) =>
         {
-            return await UpdateProduct.Handle(db, mapper, id, dto);
+            var success = await sender.Send(new UpdateProductCommand(id, dto));
+            return success ? Results.NoContent() : Results.NotFound();
         });
 
         // DELETE product
-        group.MapDelete("/{id:int}", async (AppDbContext db, int id) =>
+        group.MapDelete("/{id:int}", async (ISender sender, int id) =>
         {
-            return await DeleteProduct.Handle(db, id);
+            var success = await sender.Send(new DeleteProductCommand(id));
+            return success ? Results.NoContent() : Results.NotFound();
         });
     }
 }
